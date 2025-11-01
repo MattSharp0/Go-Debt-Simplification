@@ -90,65 +90,81 @@ func sumBalances(balances ...[]*net_balance) decimal.Decimal {
 
 func main() {
 
-	payerNetBalances := []*net_balance{
-		{user_id: 1, balance: decimal.NewFromInt(5)},
-		{user_id: 2, balance: decimal.NewFromInt(5)},
-		{user_id: 3, balance: decimal.NewFromInt(10)},
+	// debtorNetBalances := []*net_balance{
+	// 	{user_id: 1, balance: decimal.NewFromInt(5)},
+	// 	{user_id: 2, balance: decimal.NewFromInt(5)},
+	// 	{user_id: 3, balance: decimal.NewFromInt(10)},
+	// }
+
+	// creditorNetBalances := []*net_balance{
+	// 	{user_id: 4, balance: decimal.NewFromInt(-10)},
+	// 	{user_id: 5, balance: decimal.NewFromInt(-10)},
+	// }
+
+	debtorNetBalances := []*net_balance{
+		{user_id: 3, balance: decimal.NewFromInt(35)},
+		{user_id: 4, balance: decimal.NewFromInt(225)},
 	}
 
-	payeeNetBalances := []*net_balance{
-		{user_id: 4, balance: decimal.NewFromInt(-10)},
-		{user_id: 5, balance: decimal.NewFromInt(-10)},
+	creditorNetBalances := []*net_balance{
+		{user_id: 2, balance: decimal.NewFromInt(-260)},
 	}
 
-	if !sumBalances(payerNetBalances, payeeNetBalances).IsZero() {
+	if !sumBalances(debtorNetBalances, creditorNetBalances).IsZero() {
 		// in real application, this check would return an error
 		panic("Balances do not net to zero, function aborted")
 	}
 
-	payerHeap := (*maxNetBalanceHeap)(&payerNetBalances)
+	debtorHeap := (*maxNetBalanceHeap)(&debtorNetBalances)
 
-	// Initialize (and sort) payerHeap
-	heap.Init(payerHeap)
-	printMaxNetBalanceHeap(*payerHeap)
+	// Initialize (and sort) debtorHeap
+	heap.Init(debtorHeap)
+	printMaxNetBalanceHeap(*debtorHeap)
 
-	payeeHeap := (*minNetBalanceHeap)(&payeeNetBalances)
+	creditorHeap := (*minNetBalanceHeap)(&creditorNetBalances)
 
-	heap.Init(payeeHeap)
-	printMinNetBalanceHeap(*payeeHeap)
+	heap.Init(creditorHeap)
+	printMinNetBalanceHeap(*creditorHeap)
 
 	// Create a payment slice for the maximum amount of payments
-	payments := make([]payment, payerHeap.Len())
+	payments := make([]payment, debtorHeap.Len())
 	var paymentCount int
 
-	for payerHeap.Len() > 0 {
-		payer := heap.Pop(payerHeap).(*net_balance)
-		payee := heap.Pop(payeeHeap).(*net_balance)
-		delta := payee.balance.Add(payer.balance)
+	fmt.Printf("Debtor heap length: %d\n", debtorHeap.Len())
+
+	for debtorHeap.Len() > 0 {
+		fmt.Printf("Debtor heap length: %d\n", debtorHeap.Len())
+		debtor := heap.Pop(debtorHeap).(*net_balance)
+		fmt.Printf("debtor: %v, Balance: %d\n", debtor.user_id, debtor.balance.IntPart())
+
+		creditor := heap.Pop(creditorHeap).(*net_balance)
+		fmt.Printf("creditor: %v, Balance: %d\n", creditor.user_id, creditor.balance.IntPart())
+		delta := creditor.balance.Add(debtor.balance)
 
 		var pa decimal.Decimal
 
 		if delta.IsZero() {
-			pa = payer.balance
+			pa = debtor.balance
 		}
 		if delta.IsNegative() {
-			payeeHeap.Push(&net_balance{user_id: payee.user_id, balance: delta})
-			pa = delta.Abs()
+			creditorHeap.Push(&net_balance{user_id: creditor.user_id, balance: delta})
+			pa = decimal.Min(creditor.balance.Abs(), debtor.balance)
 		}
 		if delta.IsPositive() {
-			payerHeap.Push(&net_balance{user_id: payer.user_id, balance: delta})
-			pa = delta
+			debtorHeap.Push(&net_balance{user_id: debtor.user_id, balance: delta})
+			pa = decimal.Min(creditor.balance.Abs(), debtor.balance)
 		}
-		pmt := payment{from_id: payer.user_id, to_id: payee.user_id, amount: pa}
+		pmt := payment{from_id: debtor.user_id, to_id: creditor.user_id, amount: pa}
 		payments = append(payments, pmt)
 		paymentCount++
 		printPayment(pmt)
-		printMaxNetBalanceHeap(*payerHeap)
-		printMinNetBalanceHeap(*payeeHeap)
+		printMaxNetBalanceHeap(*debtorHeap)
+		printMinNetBalanceHeap(*creditorHeap)
 
 	}
 
 	payments = payments[paymentCount:]
+
 	printPayments(payments)
 
 }
